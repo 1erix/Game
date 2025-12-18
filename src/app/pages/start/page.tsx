@@ -1,4 +1,5 @@
 'use client'
+
 import Door from '@/app/entities/objects/door'
 import Armchair from '@/app/entities/start/armchair'
 import Bookcase from '@/app/entities/start/bookcase'
@@ -8,51 +9,89 @@ import Magazines from '@/app/entities/start/magazines'
 import Pictures from '@/app/entities/start/pictures'
 import Plant from '@/app/entities/start/plant'
 import Table from '@/app/entities/start/table'
-import { OrbitControls, Text } from '@react-three/drei'
+import { Text } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useRouter } from 'next/navigation'
 import BusinessCards from '@/app/entities/start/business_cards'
 import Monstera from '@/app/entities/start/monstera'
 import Player from '@/app/entities/objects/player'
-import { useRef } from 'react'
 import * as THREE from 'three'
+import { useRef, useEffect } from 'react'
+import HideCursor from '@/app/entities/functions/hideCursor'
+import DoorInteraction from '@/app/entities/functions/doorFunc'
+import LoadingScreen from '@/app/entities/functions/loading'
 
-function CameraController() {
-    const controlsRef = useRef<any>(null)
+function HybridCamera() {
+    const { camera } = useThree()
+    const player = useThree(state => state.scene.getObjectByName('player'))
 
-    const roomSize = {
-        width: 1,
-        height: 0.8,
-        depth: 1.8
+    const cameraPosition = useRef(new THREE.Vector3())
+    const cameraLookAt = useRef(new THREE.Vector3())
+    const mouseRotation = useRef({ x: 0, y: 0 })
+
+    const baseOffset = new THREE.Vector3(1, 1, -2)
+
+    const roomBounds = {
+        minX: -3.4,
+        maxX: 3.4,
+        minY: 0.5,
+        maxY: 3,
+        minZ: -2.4,
+        maxZ: 2.4
     }
 
-    useFrame(() => {
-        if (controlsRef.current) {
-            const controls = controlsRef.current
-            const target = controls.target
-            const camera = controls.object
+    const mouseSensitivity = 0.006
 
-            target.x = THREE.MathUtils.clamp(target.x, -roomSize.width, roomSize.width)
-            target.y = THREE.MathUtils.clamp(target.y, -0.8, 1.8)
-            target.z = THREE.MathUtils.clamp(target.z, -roomSize.depth, roomSize.depth)
+    useEffect(() => {
 
-            camera.position.x = THREE.MathUtils.clamp(camera.position.x, -roomSize.width - 0.1, roomSize.width + 0.1)
-            camera.position.y = THREE.MathUtils.clamp(camera.position.y, -0.7, roomSize.height + 1)
-            camera.position.z = THREE.MathUtils.clamp(camera.position.z, -roomSize.depth - 0.1, roomSize.depth + 0.1)
+        const handleMouseMove = (event: MouseEvent) => {
+            if (!player) return
 
-            controls.update()
+            mouseRotation.current.x += event.movementX * mouseSensitivity
+            mouseRotation.current.y += event.movementY * mouseSensitivity
+
+            mouseRotation.current.y = Math.max(-0.8, Math.min(0.8, mouseRotation.current.y))
         }
+
+        window.addEventListener('mousemove', handleMouseMove)
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove)
+        }
+    }, [player])
+
+    useFrame((state, delta) => {
+        if (!player) return
+
+        const targetPosition = new THREE.Vector3()
+        const lookAtTarget = new THREE.Vector3()
+
+        const spherical = new THREE.Spherical()
+        spherical.radius = baseOffset.length()
+        spherical.theta = mouseRotation.current.x + Math.PI
+        spherical.phi = Math.PI / 2 + mouseRotation.current.y
+
+        const offset = new THREE.Vector3()
+        offset.setFromSpherical(spherical)
+
+        targetPosition.copy(player.position).add(offset)
+        lookAtTarget.copy(player.position)
+
+        targetPosition.x = THREE.MathUtils.clamp(targetPosition.x, roomBounds.minX, roomBounds.maxX)
+        targetPosition.y = THREE.MathUtils.clamp(targetPosition.y, roomBounds.minY, roomBounds.maxY)
+        targetPosition.z = THREE.MathUtils.clamp(targetPosition.z, roomBounds.minZ, roomBounds.maxZ)
+
+        lookAtTarget.x = THREE.MathUtils.clamp(lookAtTarget.x, roomBounds.minX + 0.5, roomBounds.maxX - 0.5)
+        lookAtTarget.z = THREE.MathUtils.clamp(lookAtTarget.z, roomBounds.minZ + 0.5, roomBounds.maxZ - 0.5)
+
+        cameraPosition.current.lerp(targetPosition, 5 * delta)
+        cameraLookAt.current.lerp(lookAtTarget, 5 * delta)
+
+        camera.position.copy(cameraPosition.current)
+        camera.lookAt(cameraLookAt.current)
     })
 
-    return (
-        <OrbitControls
-            ref={controlsRef}
-            enablePan={true}
-            minDistance={1.5}
-            maxDistance={4}
-            target={[0, 0.5, 0]}
-        />
-    )
+    return null
 }
 
 function PlayerController() {
@@ -70,7 +109,7 @@ function PlayerController() {
         { position: [-0.8, 1.6], radius: 0.8, name: 'Table' },
         { position: [-2.8, 1.8], radius: 0.4, name: 'Plant' },
         { position: [-3.01, -1], radius: 0.5, name: 'Bookcase' },
-        { position: [-0.3, 1.9], radius: 0.3, name: 'Monstera' }
+        { position: [-0.3, 1.9], radius: 0.3, name: 'Monstera' },
     ]
 
     useFrame(() => {
@@ -111,21 +150,39 @@ export default function Home() {
     const router = useRouter()
 
     const handleDoor1Click = () => {
-        router.push('/pages/game')
+        router.push('/pages/room1?spawn=door')
     }
 
     const handleDoor2Click = () => {
-        router.push('/pages/game2')
+        router.push('/pages/room2?spawn=door')
     }
 
     const handleDoor3Click = () => {
-        router.push('/pages/game3')
+        router.push('/pages/room3?spawn=door')
     }
 
+    const doorPositions = [
+        {
+            position: [-2, -1, -2.45] as [number, number, number],
+            onInteract: handleDoor1Click
+        },
+        {
+            position: [0, -1, -2.45] as [number, number, number],
+            onInteract: handleDoor2Click
+        },
+        {
+            position: [2, -1, -2.45] as [number, number, number],
+            onInteract: handleDoor3Click
+        }
+    ]
+
     return (
+
         <div style={{ width: '100vw', height: '100vh' }}>
+            <LoadingScreen />
             <Canvas>
-                <CameraController />
+                <HideCursor />
+                <HybridCamera />
                 <PlayerController />
 
                 <ambientLight intensity={1.2} />
@@ -142,6 +199,9 @@ export default function Home() {
                     shadow-camera-bottom={-10}
                 />
                 <pointLight position={[10, 10, 10]} />
+
+                <DoorInteraction doorPositions={doorPositions} />
+
 
                 <Door scale={0.01} position={[-2, -1, -2.45]} onDoorClick={handleDoor1Click} />
                 <Door scale={0.01} position={[0, -1, -2.45]} onDoorClick={handleDoor2Click} />

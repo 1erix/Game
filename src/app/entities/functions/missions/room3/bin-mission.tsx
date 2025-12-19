@@ -12,7 +12,6 @@ import Pen from '@/app/entities/room3/trash/pen'
 import Pencil from '@/app/entities/room3/trash/pen-pencil'
 import Bin from '@/app/entities/room3/bin'
 
-// Глобальное состояние миссии
 export const transparencyMission = {
     showHint: false,
     gameActive: false,
@@ -22,22 +21,18 @@ export const transparencyMission = {
     itemsToKeep: ['notebook', 'cleanPaper']
 }
 
-// Позиции для миссии
 const TABLE_POSITION = new THREE.Vector3(1.5, -1, 1.5)
 const TABLE_HEIGHT = 0.12
 const BIN_POSITION: [number, number, number] = [-1.2, -1, 2.5]
 const BIN_SCALE = 1
 
-// Переменные для управления камерой и игроком
 let originalCameraPos: THREE.Vector3 | null = null
 let originalCameraRotation: THREE.Euler | null = null
 let cameraLocked = false
 let playerControls: any = null
 
-// Глобальная переменная для текущего перетаскиваемого предмета
 let currentDraggedItem: THREE.Group | null = null
 
-// Функция для фиксации камеры сверху
 function lockCameraTopView(camera: THREE.Camera, gl: THREE.WebGLRenderer) {
     console.log('Фиксация камеры сверху')
     cameraLocked = true
@@ -89,7 +84,6 @@ function lockCameraTopView(camera: THREE.Camera, gl: THREE.WebGLRenderer) {
     }
 }
 
-// Функция для разблокировки камеры
 function unlockCamera(camera: THREE.Camera, gl: THREE.WebGLRenderer) {
     console.log('Разблокировка камеры')
     cameraLocked = false
@@ -112,13 +106,13 @@ function unlockCamera(camera: THREE.Camera, gl: THREE.WebGLRenderer) {
     }
 }
 
-// React компонент для UI
 interface UIState {
     showHint: boolean
     gameActive: boolean
     missionComplete: boolean
     itemsRemaining: number
     totalItems: number
+    showCompletionMessage: boolean
 }
 
 export function TransparencyMissionUI() {
@@ -127,8 +121,11 @@ export function TransparencyMissionUI() {
         gameActive: transparencyMission.gameActive,
         missionComplete: transparencyMission.missionComplete,
         itemsRemaining: transparencyMission.targetItems.length - transparencyMission.draggedItems.size,
-        totalItems: transparencyMission.targetItems.length
+        totalItems: transparencyMission.targetItems.length,
+        showCompletionMessage: false
     })
+
+    const congratsTimer = useRef<NodeJS.Timeout>()
 
     useEffect(() => {
         const updateState = () => {
@@ -137,7 +134,8 @@ export function TransparencyMissionUI() {
                 gameActive: transparencyMission.gameActive,
                 missionComplete: transparencyMission.missionComplete,
                 itemsRemaining: transparencyMission.targetItems.length - transparencyMission.draggedItems.size,
-                totalItems: transparencyMission.targetItems.length
+                totalItems: transparencyMission.targetItems.length,
+                showCompletionMessage: state.showCompletionMessage
             })
         }
 
@@ -145,6 +143,11 @@ export function TransparencyMissionUI() {
         const handleProgressUpdate = () => updateState()
         const handleMissionComplete = () => {
             transparencyMission.missionComplete = true
+
+            congratsTimer.current = setTimeout(() => {
+                setState(prev => ({ ...prev, showCompletionMessage: true }))
+            }, 5000)
+
             updateState()
         }
 
@@ -155,6 +158,9 @@ export function TransparencyMissionUI() {
             clearInterval(interval)
             window.removeEventListener('missionProgressUpdate', handleProgressUpdate)
             window.removeEventListener('missionComplete', handleMissionComplete)
+            if (congratsTimer.current) {
+                clearTimeout(congratsTimer.current)
+            }
         }
     }, [])
 
@@ -166,31 +172,17 @@ export function TransparencyMissionUI() {
         }
     }, [state.gameActive, state.missionComplete])
 
-    const handleReset = () => {
-        transparencyMission.missionComplete = false
-        transparencyMission.gameActive = false
-        transparencyMission.draggedItems.clear()
-        transparencyMission.showHint = false
-
-        setState({
-            showHint: false,
-            gameActive: false,
-            missionComplete: false,
-            itemsRemaining: transparencyMission.targetItems.length,
-            totalItems: transparencyMission.targetItems.length
-        })
-
-        window.location.reload()
-    }
-
     const handleClose = () => {
         transparencyMission.missionComplete = false
-        setState(prev => ({ ...prev, missionComplete: false }))
+        setState(prev => ({ ...prev, missionComplete: false, showCompletionMessage: false }))
+
+        if (congratsTimer.current) {
+            clearTimeout(congratsTimer.current)
+        }
     }
 
     return (
         <>
-            {/* Подсказка о нажатии F - стили как в ClickSprintMission */}
             {state.showHint && !state.gameActive && !state.missionComplete && (
                 <div style={{
                     position: 'fixed',
@@ -206,16 +198,15 @@ export function TransparencyMissionUI() {
                     fontSize: '18px',
                     fontWeight: 'bold',
                     textAlign: 'center',
-                    border: '2px solid #00BCD4',
+                    border: '2px solid #ff9900',
                     pointerEvents: 'none',
                     backdropFilter: 'blur(5px)',
                     whiteSpace: 'nowrap'
                 }}>
-                    Нажмите F чтобы начать миссию "Прозрачность"
+                    Нажмите F, чтобы начать
                 </div>
             )}
 
-            {/* Интерфейс во время миссии - стили как в ClickSprintMission */}
             {state.gameActive && (
                 <div style={{
                     position: 'fixed',
@@ -240,7 +231,7 @@ export function TransparencyMissionUI() {
                         color: '#3498db',
                         fontWeight: 'bold'
                     }}>
-                        💎 Миссия: Прозрачность
+                        Миссия: Прозрачность
                     </div>
 
                     <div style={{
@@ -255,16 +246,6 @@ export function TransparencyMissionUI() {
                     </div>
 
                     <div style={{
-                        fontSize: '28px',
-                        fontWeight: 'bold',
-                        color: state.itemsRemaining === 0 ? '#2ecc71' : '#3498db',
-                        margin: '10px 0',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                    }}>
-                        {state.itemsRemaining}
-                    </div>
-
-                    <div style={{
                         fontSize: '14px',
                         opacity: 0.8,
                         marginTop: '10px'
@@ -274,8 +255,7 @@ export function TransparencyMissionUI() {
                 </div>
             )}
 
-            {/* Сообщение об успехе - стили как в ClickSprintMission */}
-            {state.missionComplete && (
+            {state.missionComplete && state.showCompletionMessage && (
                 <div style={{
                     position: 'fixed',
                     top: '50%',
@@ -290,7 +270,10 @@ export function TransparencyMissionUI() {
                     textAlign: 'center',
                     border: '3px solid #2ecc71',
                     backdropFilter: 'blur(10px)',
-                    boxShadow: '0 10px 30px rgba(46, 204, 113, 0.3)'
+                    boxShadow: '0 10px 30px rgba(46, 204, 113, 0.3)',
+                    minWidth: '400px',
+                    maxWidth: '500px',
+                    animation: 'fadeIn 0.3s ease-out'
                 }}>
                     <div style={{
                         fontSize: '28px',
@@ -303,76 +286,57 @@ export function TransparencyMissionUI() {
 
                     <div style={{
                         fontSize: '18px',
-                        marginBottom: '25px'
-                    }}>
-                        Вы навели порядок на рабочем столе!
-                    </div>
-
-                    <div style={{
-                        fontSize: '16px',
-                        marginBottom: '20px',
-                        color: '#3498db',
-                        padding: '10px',
+                        marginBottom: '25px',
+                        padding: '15px',
                         background: 'rgba(52, 152, 219, 0.1)',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        lineHeight: '1.5'
                     }}>
-                        <strong>💎 Ценность компании: Прозрачность</strong>
-                        <div style={{ fontSize: '14px', marginTop: '5px', opacity: 0.9 }}>
-                            Прозрачность начинается с ясности и порядка на рабочем месте,
-                            устранения всего лишнего, что мешает сосредоточиться на сути.
-                        </div>
+                        <strong>Ценность компании: Прозрачность</strong><br />
+                        Правильная утилизация показывает нашу открытость и честность во всех процессах!
                     </div>
 
-                    <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        gap: '15px',
-                        marginTop: '20px'
-                    }}>
-                        <button
-                            onClick={handleClose}
-                            style={{
-                                padding: '10px 20px',
-                                background: 'linear-gradient(45deg, #4CAF50, #2ecc71)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                transition: 'all 0.3s ease'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                            Отлично!
-                        </button>
+                    <button
+                        onClick={handleClose}
+                        style={{
+                            padding: '12px 24px',
+                            background: 'linear-gradient(45deg, #4CAF50, #2ecc71)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            transition: 'all 0.3s ease',
+                            width: '100%'
+                        }}
+                        onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)'
+                            document.body.style.cursor = 'pointer'
+                        }}
+                        onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)'
+                            document.body.style.cursor = 'default'
+                        }}
+                        onMouseDown={(e) => {
+                            document.body.style.cursor = 'default'
+                        }}
+                    >
+                        Отлично!
+                    </button>
 
-                        <button
-                            onClick={handleReset}
-                            style={{
-                                padding: '10px 20px',
-                                background: 'rgba(255,255,255,0.1)',
-                                color: 'white',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                transition: 'all 0.3s ease'
-                            }}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-                                e.currentTarget.style.transform = 'scale(1.05)'
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                                e.currentTarget.style.transform = 'scale(1)'
-                            }}
-                        >
-                            Начать заново
-                        </button>
-                    </div>
+                    <style jsx>{`
+                        @keyframes fadeIn {
+                            from { 
+                                opacity: 0; 
+                                transform: translate(-50%, -60%); 
+                            }
+                            to { 
+                                opacity: 1; 
+                                transform: translate(-50%, -50%); 
+                            }
+                        }
+                    `}</style>
                 </div>
             )}
         </>
@@ -473,7 +437,6 @@ function TrashBin() {
     )
 }
 
-// Компонент предмета для перетаскивания
 interface DraggableItemProps {
     name: string
     position: [number, number, number]
@@ -496,41 +459,56 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
     const isDraggingStarted = useRef(false)
     const currentHeight = useRef(position[1])
     const binWorldPosition = useRef<THREE.Vector3 | null>(null)
+    const pulseRef = useRef<THREE.Group>(null)
+    const [shouldGlow, setShouldGlow] = useState(false)
 
-    // Улучшенная функция для проверки находится ли предмет в корзине
+    useEffect(() => {
+        const isTargetItem = transparencyMission.targetItems.includes(name)
+        const showGlow = transparencyMission.gameActive &&
+            !transparencyMission.missionComplete &&
+            !isDragging &&
+            !isRemoved &&
+            isTargetItem
+
+        if (isTargetItem) {
+            setShouldGlow(showGlow)
+        }
+    }, [transparencyMission.gameActive, transparencyMission.missionComplete, isDragging, isRemoved, name])
+
+    useFrame((state) => {
+        if (shouldGlow && pulseRef.current) {
+            const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.1
+            pulseRef.current.scale.setScalar(scale)
+        }
+    })
+
     const checkIfInTrash = (): boolean => {
         if (!itemRef.current) return false
 
         const trashBin = scene.getObjectByName('trashBin')
         if (!trashBin) return false
 
-        // Получаем мировые позиции
         const itemWorldPos = new THREE.Vector3()
         itemRef.current.getWorldPosition(itemWorldPos)
 
         const binWorldPos = new THREE.Vector3()
         trashBin.getWorldPosition(binWorldPos)
 
-        // Сохраняем позицию корзины для анимации
         binWorldPosition.current = binWorldPos
 
-        // Определяем размеры корзины
         const binRadius = 0.5
         const binHeight = 1.0
 
-        // Проверяем расстояние по горизонтали
         const horizontalDistance = Math.sqrt(
             Math.pow(itemWorldPos.x - binWorldPos.x, 2) +
             Math.pow(itemWorldPos.z - binWorldPos.z, 2)
         )
 
-        // Проверяем высоту
         const verticalDistance = Math.abs(itemWorldPos.y - binWorldPos.y)
 
         return horizontalDistance < binRadius && verticalDistance < binHeight
     }
 
-    // Обработчик начала перетаскивания
     const handlePointerDown = (e: any) => {
         e.stopPropagation()
 
@@ -538,6 +516,7 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
 
         setIsDragging(true)
         isDraggingStarted.current = true
+        setShouldGlow(false)
 
         if (itemRef.current) {
             itemRef.current.userData.isDragging = true
@@ -567,7 +546,6 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
         gl.domElement.style.cursor = 'grabbing'
     }
 
-    // Обновление позиции при перетаскивании
     useFrame((state) => {
         if (!isDragging || !itemRef.current || !isDraggingStarted.current) return
 
@@ -601,7 +579,6 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
         }
     })
 
-    // Обработчик отпускания мыши - исправленная версия
     const handlePointerUp = () => {
         if (!isDragging) return
 
@@ -616,23 +593,20 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
             itemRef.current.scale.setScalar(1)
         }
 
-        // Проверяем, находился ли предмет в корзине в момент отпускания
         const isActuallyInTrash = checkIfInTrash()
 
         if (isActuallyInTrash && transparencyMission.targetItems.includes(name)) {
-            console.log(`🎯 Предмет "${name}" попал в корзину!`)
+            console.log(` Предмет "${name}" попал в корзину!`)
 
             setIsRemoved(true)
 
             if (!transparencyMission.draggedItems.has(name)) {
                 transparencyMission.draggedItems.add(name)
-                console.log(`✅ Предмет "${name}" удален. Всего удалено: ${transparencyMission.draggedItems.size}/${transparencyMission.targetItems.length}`)
+                console.log(`Предмет "${name}" удален. Всего удалено: ${transparencyMission.draggedItems.size}/${transparencyMission.targetItems.length}`)
 
                 window.dispatchEvent(new CustomEvent('missionProgressUpdate'));
 
-                // Визуальная обратная связь
                 if (itemRef.current) {
-                    // Анимация падения в корзину
                     const targetPosition = new THREE.Vector3(
                         binWorldPosition.current?.x || -1.2,
                         binWorldPosition.current?.y || -1,
@@ -671,17 +645,21 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
 
             if (onDragEnd) onDragEnd(true)
 
-            // Проверяем завершение миссии
             if (transparencyMission.draggedItems.size === transparencyMission.targetItems.length) {
                 setTimeout(() => {
                     transparencyMission.missionComplete = true
                     transparencyMission.gameActive = false
-                    console.log('🎉 Все предметы убраны! Миссия завершена!')
+                    console.log(' Все предметы убраны! Миссия завершена!')
                     window.dispatchEvent(new CustomEvent('missionComplete'));
                 }, 500)
             }
         } else {
-            console.log(`❌ Предмет "${name}" не попал в корзину`)
+            console.log(` Предмет "${name}" не попал в корзину`)
+
+            const isTargetItem = transparencyMission.targetItems.includes(name)
+            if (isTargetItem) {
+                setShouldGlow(true)
+            }
 
             if (itemRef.current) {
                 const startPos = itemRef.current.position.clone()
@@ -709,7 +687,6 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
         gl.domElement.style.cursor = 'default'
     }
 
-    // Настройка событий мыши и клавиатуры
     useEffect(() => {
         const handleGlobalMouseUp = () => {
             if (isDragging) {
@@ -752,7 +729,6 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
         }
     }, [isDragging, isInTrash, isRemoved])
 
-    // Определяем какой компонент рендерить
     const renderModel = () => {
         switch (type) {
             case 'pencil':
@@ -803,6 +779,8 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
 
     if (isRemoved) return null
 
+    const isTargetItem = transparencyMission.targetItems.includes(name)
+
     return (
         <group
             ref={itemRef}
@@ -824,6 +802,26 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
             }}
         >
             {renderModel()}
+
+            {shouldGlow && isTargetItem && (
+                <group ref={pulseRef}>
+                    <pointLight
+                        position={[0, 0.2, 0]}
+                        intensity={0.8}
+                        color="#ff9900"
+                        distance={1.5}
+                    />
+
+                    <mesh position={[0, 0.2, 0]}>
+                        <sphereGeometry args={[0.2, 16, 16]} />
+                        <meshBasicMaterial
+                            color="#ff9900"
+                            transparent
+                            opacity={0.3}
+                        />
+                    </mesh>
+                </group>
+            )}
 
             {isDragging && (
                 <pointLight
@@ -876,15 +874,13 @@ function DraggableItem({ name, position, type, onDragStart, onDragEnd }: Draggab
     )
 }
 
-// Компонент иконки задания - стили как в ClickSprintMission
-interface MissionIconProps {
-    visible?: boolean
-}
 
-function MissionIcon({ visible = true }: MissionIconProps) {
-    if (!visible) return null
-
+function MissionIcon() {
     const completed = transparencyMission.missionComplete
+
+    if (transparencyMission.gameActive) return null
+
+    if (transparencyMission.missionComplete) return null
 
     return (
         <Html
@@ -902,27 +898,19 @@ function MissionIcon({ visible = true }: MissionIconProps) {
                 justifyContent: 'center',
                 transform: 'translate(-50%, -50%)'
             }}>
-                {/* Основная иконка */}
                 <div style={{
                     width: '60px',
                     height: '60px',
                     borderRadius: '12px',
-                    background: completed
-                        ? 'linear-gradient(135deg, #2ecc71, #27ae60)'
-                        : 'linear-gradient(135deg, #00BCD4, #0097A7)',
+                    background: 'linear-gradient(135deg, #ff9900, #ff6600)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: completed
-                        ? '0 8px 20px rgba(46, 204, 113, 0.4)'
-                        : '0 8px 20px rgba(0, 188, 212, 0.4)',
-                    border: completed
-                        ? '2px solid #2ecc71'
-                        : '2px solid #00BCD4',
+                    boxShadow: '0 8px 20px rgba(255, 153, 0, 0.4)',
+                    border: '2px solid #ff9900',
                     position: 'relative',
                     overflow: 'hidden'
                 }}>
-                    {/* Внутренний круг */}
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -932,61 +920,42 @@ function MissionIcon({ visible = true }: MissionIconProps) {
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        {/* Иконка */}
-                        {completed ? (
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="white"
-                                strokeWidth="2"
-                                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
-                            >
-                                <path d="M20 6L9 17L4 12" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        ) : (
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="white"
-                                strokeWidth="2"
-                                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
-                            >
-                                <circle cx="12" cy="12" r="10" />
-                                <path d="M12 8V12" strokeLinecap="round" />
-                                <path d="M12 16H12.01" strokeLinecap="round" />
-                            </svg>
-                        )}
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                        >
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 8V12" strokeLinecap="round" />
+                            <path d="M12 16H12.01" strokeLinecap="round" />
+                        </svg>
                     </div>
 
-                    {/* Анимация пульсации для активного задания */}
-                    {!completed && !transparencyMission.gameActive && (
-                        <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            borderRadius: '12px',
-                            border: '2px solid rgba(255, 255, 255, 0.5)',
-                            animation: 'pulse 2s infinite'
-                        }} />
-                    )}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        borderRadius: '12px',
+                        border: '2px solid rgba(255, 255, 255, 0.5)',
+                        animation: 'pulse 2s infinite'
+                    }} />
                 </div>
 
-                {/* Текст под иконкой */}
                 <div style={{
                     marginTop: '8px',
                     fontSize: '14px',
                     fontWeight: 'bold',
-                    color: completed ? '#2ecc71' : '#00BCD4',
+                    color: '#ff9900',
                     textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                     whiteSpace: 'nowrap'
                 }}>
-                    {completed ? 'ВЫПОЛНЕНО' : 'ЗАДАНИЕ'}
+                    ЗАДАНИЕ
                 </div>
 
                 <style>{`
@@ -1001,7 +970,6 @@ function MissionIcon({ visible = true }: MissionIconProps) {
     )
 }
 
-// Интерфейс для предмета
 interface ItemData {
     id: string
     name: string
@@ -1009,12 +977,11 @@ interface ItemData {
     type: 'pencil' | 'pen' | 'gum' | 'bottle' | 'cup' | 'paper' | 'notebook' | 'cleanPaper'
 }
 
-// Основной компонент миссии
+
 export default function TransparencyMission() {
     const { scene, camera, gl } = useThree()
     const [items, setItems] = useState<ItemData[]>([])
 
-    // Фрейм для принудительной фиксации камеры
     useFrame(() => {
         if (cameraLocked) {
             const tablePosition = TABLE_POSITION.clone()
@@ -1043,7 +1010,6 @@ export default function TransparencyMission() {
         }
     })
 
-    // Инициализация предметов
     useEffect(() => {
         console.log('Инициализация миссии прозрачности')
 
@@ -1053,7 +1019,6 @@ export default function TransparencyMission() {
         }
 
         const initialItems: ItemData[] = [
-            // Мусор (для удаления)
             {
                 id: 'pencil1', name: 'pencil1', position: [
                     TABLE_POSITION.x - 0.4,
@@ -1097,7 +1062,6 @@ export default function TransparencyMission() {
                 ] as [number, number, number], type: 'paper'
             },
 
-            // Предметы которые должны остаться
             {
                 id: 'notebook', name: 'notebook', position: [
                     TABLE_POSITION.x - 0.2,
@@ -1124,7 +1088,6 @@ export default function TransparencyMission() {
         }
     }, [scene, camera, gl])
 
-    // Проверка близости к столу
     useFrame(() => {
         if (transparencyMission.gameActive || transparencyMission.missionComplete) return
 
@@ -1142,7 +1105,6 @@ export default function TransparencyMission() {
         }
     })
 
-    // Обработка клавиши F
     useEffect(() => {
         const handleKeyPress = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase()
@@ -1167,20 +1129,20 @@ export default function TransparencyMission() {
     }
 
     const handleItemDragged = (itemName: string, success: boolean) => {
-        console.log(`🔄 Обработка предмета "${itemName}", успех: ${success}`)
+        console.log(` Обработка предмета "${itemName}", успех: ${success}`)
 
         if (success && transparencyMission.targetItems.includes(itemName)) {
-            console.log(`📌 Предмет "${itemName}" должен быть удален`)
+            console.log(` Предмет "${itemName}" должен быть удален`)
 
             if (!transparencyMission.draggedItems.has(itemName)) {
                 transparencyMission.draggedItems.add(itemName)
-                console.log(`✅ Предмет "${itemName}" добавлен. Всего: ${transparencyMission.draggedItems.size}`)
+                console.log(` Предмет "${itemName}" добавлен. Всего: ${transparencyMission.draggedItems.size}`)
             } else {
-                console.log(`⚠️ Предмет "${itemName}" уже был добавлен`)
+                console.log(` Предмет "${itemName}" уже был добавлен`)
             }
 
             if (transparencyMission.draggedItems.size === transparencyMission.targetItems.length) {
-                console.log('🎉 Миссия завершена! Все предметы удалены.')
+                console.log(' Миссия завершена! Все предметы удалены.')
                 completeMission()
             }
         }
@@ -1192,11 +1154,15 @@ export default function TransparencyMission() {
         transparencyMission.missionComplete = true
 
         unlockCamera(camera, gl)
+
+        setTimeout(() => {
+            document.body.style.cursor = 'none'
+        }, 100)
     }
 
     return (
         <>
-            <MissionIcon visible={!transparencyMission.gameActive} />
+            <MissionIcon />
             <TrashBin />
 
             {items.map(item => (

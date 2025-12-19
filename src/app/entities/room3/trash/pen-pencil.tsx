@@ -11,7 +11,7 @@ export default function Pencil({ position }: PencilProps) {
         <primitive
             object={scene}
             position={position}
-            scale={0.8}
+            scale={1}
         />
     )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import DoorInteraction from "@/app/entities/functions/doorFunc"
+import HideCursor from "@/app/entities/functions/hideCursor"
 import LoadingScreen from "@/app/entities/functions/loading"
 import TransparencyMission, { TransparencyMissionUI } from "@/app/entities/functions/missions/room3/bin-mission"
 import Door from "@/app/entities/objects/door"
@@ -25,128 +26,73 @@ import WaterCooler from "@/app/entities/room3/watercooler"
 import FloorTexture from "@/app/entities/textures/floortexture"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { useRouter } from "next/navigation"
-import { Suspense, useEffect, useRef } from "react"
+import { Suspense, useRef } from "react"
 import * as THREE from 'three'
 
-function HybridCamera() {
-    const { camera } = useThree()
-    const player = useThree(state => state.scene.getObjectByName('player'))
-
-    const cameraPosition = useRef(new THREE.Vector3())
-    const cameraLookAt = useRef(new THREE.Vector3())
-    const mouseRotation = useRef({ x: 0, y: 0 })
-    const isInitialized = useRef(false)
-    const cursorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-    const baseOffset = new THREE.Vector3(1, 1, -2)
+function applyCameraConstraints(camera: THREE.Camera, cameraPosition: THREE.Vector3, playerPosition: THREE.Vector3): THREE.Vector3 {
+    const wallOffset = 0.8
 
     const roomBounds = {
-        minX: -2.9,
-        maxX: 2.9,
-        minY: 0.5,
-        maxY: 3,
-        minZ: -2.9,
-        maxZ: 2.9
+        minX: -3.5 + wallOffset,
+        maxX: 3.5 - wallOffset,
+        minY: 0.8,
+        maxY: 2.2,
+        minZ: -3.5 + wallOffset,
+        maxZ: 3.5 - wallOffset
     }
 
-    const mouseSensitivity = 0.006
+    const lookAtTarget = playerPosition.clone().add(new THREE.Vector3(0, 0.8, 0))
 
-    useEffect(() => {
-        cursorTimeoutRef.current = setTimeout(() => {
-            document.body.style.cursor = 'none'
-        }, 2000)
+    const constrainedPosition = cameraPosition.clone()
 
-        const initTimeout = setTimeout(() => {
-            if (player && !isInitialized.current) {
-                const initialPosition = new THREE.Vector3()
-                const lookAt = new THREE.Vector3()
+    constrainedPosition.x = THREE.MathUtils.clamp(
+        constrainedPosition.x,
+        roomBounds.minX,
+        roomBounds.maxX
+    )
 
-                const spherical = new THREE.Spherical()
-                spherical.radius = baseOffset.length()
-                spherical.theta = Math.PI
-                spherical.phi = Math.PI / 2
+    constrainedPosition.y = THREE.MathUtils.clamp(
+        constrainedPosition.y,
+        roomBounds.minY,
+        roomBounds.maxY
+    )
 
-                const offset = new THREE.Vector3()
-                offset.setFromSpherical(spherical)
+    constrainedPosition.z = THREE.MathUtils.clamp(
+        constrainedPosition.z,
+        roomBounds.minZ,
+        roomBounds.maxZ
+    )
 
-                initialPosition.copy(player.position).add(offset)
-                lookAt.copy(player.position)
+    camera.position.copy(constrainedPosition)
+    camera.lookAt(lookAtTarget)
 
-                initialPosition.x = THREE.MathUtils.clamp(initialPosition.x, roomBounds.minX, roomBounds.maxX)
-                initialPosition.y = THREE.MathUtils.clamp(initialPosition.y, roomBounds.minY, roomBounds.maxY)
-                initialPosition.z = THREE.MathUtils.clamp(initialPosition.z, roomBounds.minZ, roomBounds.maxZ)
+    return constrainedPosition
+}
 
-                lookAt.x = THREE.MathUtils.clamp(lookAt.x, roomBounds.minX + 0.5, roomBounds.maxX - 0.5)
-                lookAt.z = THREE.MathUtils.clamp(lookAt.z, roomBounds.minZ + 0.5, roomBounds.maxZ - 0.5)
+function CameraController() {
+    const { camera, scene } = useThree()
+    const cameraPosition = useRef(new THREE.Vector3(0, 0.8, -2.5))
 
-                camera.position.copy(initialPosition)
-                camera.lookAt(lookAt)
+    const horizontalOffset = useRef(new THREE.Vector3(0, 0, -2.5))
 
-                cameraPosition.current.copy(initialPosition)
-                cameraLookAt.current.copy(lookAt)
-
-                isInitialized.current = true
-            }
-        }, 100)
-
-        const handleMouseMove = (event: MouseEvent) => {
-            if (!player) return
-
-            mouseRotation.current.x += event.movementX * mouseSensitivity
-            mouseRotation.current.y += event.movementY * mouseSensitivity
-
-            mouseRotation.current.y = Math.max(-0.8, Math.min(0.8, mouseRotation.current.y))
-        }
-
-        window.addEventListener('mousemove', handleMouseMove)
-
-        return () => {
-            if (cursorTimeoutRef.current) {
-                clearTimeout(cursorTimeoutRef.current)
-            }
-            clearTimeout(initTimeout)
-            window.removeEventListener('mousemove', handleMouseMove)
-            document.body.style.cursor = 'default'
-        }
-    }, [player, camera])
-
-    useFrame((state, delta) => {
+    useFrame(() => {
+        const player = scene.getObjectByName('player')
         if (!player) return
 
-        const targetPosition = new THREE.Vector3()
-        const lookAtTarget = new THREE.Vector3()
+        const playerRotationY = player.rotation.y
 
-        const spherical = new THREE.Spherical()
-        spherical.radius = baseOffset.length()
-        spherical.theta = mouseRotation.current.x + Math.PI
-        spherical.phi = Math.PI / 2 + mouseRotation.current.y
+        const rotatedHorizontalOffset = horizontalOffset.current.clone().applyAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            playerRotationY
+        )
 
-        const offset = new THREE.Vector3()
-        offset.setFromSpherical(spherical)
+        const targetCameraPosition = player.position.clone()
+            .add(rotatedHorizontalOffset)
+            .add(new THREE.Vector3(0, 0.8, 0))
 
-        targetPosition.copy(player.position).add(offset)
-        lookAtTarget.copy(player.position)
+        cameraPosition.current.lerp(targetCameraPosition, 0.1)
 
-        targetPosition.x = THREE.MathUtils.clamp(targetPosition.x, roomBounds.minX, roomBounds.maxX)
-        targetPosition.y = THREE.MathUtils.clamp(targetPosition.y, roomBounds.minY, roomBounds.maxY)
-        targetPosition.z = THREE.MathUtils.clamp(targetPosition.z, roomBounds.minZ, roomBounds.maxZ)
-
-        lookAtTarget.x = THREE.MathUtils.clamp(lookAtTarget.x, roomBounds.minX + 0.5, roomBounds.maxX - 0.5)
-        lookAtTarget.z = THREE.MathUtils.clamp(lookAtTarget.z, roomBounds.minZ + 0.5, roomBounds.maxZ - 0.5)
-
-        if (!isInitialized.current) {
-            cameraPosition.current.copy(targetPosition)
-            cameraLookAt.current.copy(lookAtTarget)
-            camera.position.copy(targetPosition)
-            camera.lookAt(lookAtTarget)
-            isInitialized.current = true
-        } else {
-            cameraPosition.current.lerp(targetPosition, 5 * delta)
-            cameraLookAt.current.lerp(lookAtTarget, 5 * delta)
-
-            camera.position.copy(cameraPosition.current)
-            camera.lookAt(cameraLookAt.current)
-        }
+        applyCameraConstraints(camera, cameraPosition.current, player.position)
     })
 
     return null
@@ -158,8 +104,6 @@ function PlayerController() {
     const boundsPlayer = {
         minX: -2.9,
         maxX: 2.9,
-        minY: 0.5,
-        maxY: 3,
         minZ: -2.9,
         maxZ: 2.9
     }
@@ -173,7 +117,6 @@ function PlayerController() {
         { position: [-3.05, -1.57,], rotation: [0, 0, 0], radius: 0.5, name: 'coffetable' },
         { position: [-3.28, 2.45,], rotation: [0, 0, 0], radius: 0.5, name: 'bookcase' },
         { position: [3.1, -1.3,], rotation: [0, 0, 0], radius: 0.5, name: 'bin' },
-
     ]
 
     useFrame(() => {
@@ -205,13 +148,6 @@ function PlayerController() {
         }
 
         player.position.copy(playerPos)
-
-
-
-
-
-
-        // console.log(playerPos)
     })
 
     return null
@@ -234,8 +170,12 @@ export default function ThirdRoom() {
         <div style={{ width: '100vw', height: '100vh' }}>
             <LoadingScreen />
             <TransparencyMissionUI />
-            <Canvas>
+            <Canvas camera={{ position: [0, 0.8, -2.5], fov: 65 }}>
                 <Suspense fallback={null}>
+                    <CameraController />
+                    <PlayerController />
+                    <HideCursor />
+
                     <ambientLight intensity={1} />
                     <directionalLight
                         position={[7, 7, 3.5]}
@@ -249,9 +189,6 @@ export default function ThirdRoom() {
                         shadow-camera-top={10}
                         shadow-camera-bottom={-10} />
                     <pointLight position={[0, 2, 2.5]} intensity={2} color={'white'} />
-
-                    <HybridCamera />
-                    <PlayerController />
 
                     <Door position={[0, -1, -3.4]} scale={0.01} onDoorClick={handleDoorClick} />
                     <DoorInteraction doorPositions={doorPosition} />

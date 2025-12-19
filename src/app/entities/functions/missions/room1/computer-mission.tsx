@@ -1,4 +1,3 @@
-// app/entities/functions/missions/room1/computer-mission.tsx
 'use client'
 
 import { useFrame, useThree } from '@react-three/fiber'
@@ -6,44 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Html } from '@react-three/drei'
 
-// === ПРОСТАЯ СИСТЕМА ДОСТИЖЕНИЙ (встроенная) ===
-const ALL_MISSIONS = ['click-sprint-mission', 'computer-speed-mission']
-
-// Функция для отметки выполнения миссии
-const markMissionComplete = (missionId: string) => {
-    // Сохраняем в localStorage
-    localStorage.setItem(`mission-${missionId}`, 'completed')
-
-    // Проверяем все ли миссии выполнены
-    const allCompleted = ALL_MISSIONS.every(id =>
-        localStorage.getItem(`mission-${id}`) === 'completed'
-    )
-
-    if (allCompleted && !localStorage.getItem('speed-achievement-shown')) {
-        // Показываем достижение через 1 секунду
-        setTimeout(() => {
-            const event = new CustomEvent('show-achievement')
-            window.dispatchEvent(event)
-            localStorage.setItem('speed-achievement-shown', 'true')
-        }, 1000)
-    }
-}
-
-// Хук для миссии
-const useSimpleMission = (missionId: string) => {
-    const complete = () => {
-        markMissionComplete(missionId)
-    }
-
-    const isCompleted = () => {
-        return localStorage.getItem(`mission-${missionId}`) === 'completed'
-    }
-
-    return { complete, isCompleted }
-}
-// === КОНЕЦ СИСТЕМЫ ДОСТИЖЕНИЙ ===
-
-// Глобальное состояние миссии
 const speedMissionGlobal = {
     showHint: false,
     gameActive: false,
@@ -58,7 +19,6 @@ const speedMissionGlobal = {
     hasBeenCompletedInSession: false
 }
 
-// Компонент иконки задания
 function SpeedMissionIcon({ position, completed = false, visible = true }: {
     position: [number, number, number],
     completed?: boolean,
@@ -84,7 +44,6 @@ function SpeedMissionIcon({ position, completed = false, visible = true }: {
                 justifyContent: 'center',
                 transform: 'translate(-50%, -50%)'
             }}>
-                {/* Основная иконка */}
                 <div style={{
                     width: '60px',
                     height: '60px',
@@ -104,7 +63,6 @@ function SpeedMissionIcon({ position, completed = false, visible = true }: {
                     position: 'relative',
                     overflow: 'hidden'
                 }}>
-                    {/* Внутренний круг */}
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -114,7 +72,6 @@ function SpeedMissionIcon({ position, completed = false, visible = true }: {
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        {/* Иконка */}
                         {completed ? (
                             <svg
                                 width="24"
@@ -144,7 +101,6 @@ function SpeedMissionIcon({ position, completed = false, visible = true }: {
                         )}
                     </div>
 
-                    {/* Анимация пульсации для активного задания */}
                     {!completed && !speedMissionGlobal.gameActive && speedMissionGlobal.isInteractable && (
                         <div style={{
                             position: 'absolute',
@@ -159,7 +115,6 @@ function SpeedMissionIcon({ position, completed = false, visible = true }: {
                     )}
                 </div>
 
-                {/* Текст под иконкой */}
                 <div style={{
                     marginTop: '8px',
                     fontSize: '14px',
@@ -194,7 +149,6 @@ export default function ComputerSpeedMission({
     const computerRef = useRef<THREE.Group>(null)
     const playerRef = useRef<THREE.Object3D | null>(null)
 
-    // Состояние для фиксации камеры
     const cameraLocked = useRef(false)
     const originalCameraPosition = useRef<THREE.Vector3 | null>(null)
     const originalCameraRotation = useRef<THREE.Euler | null>(null)
@@ -209,21 +163,15 @@ export default function ComputerSpeedMission({
         velocity: { x: number; y: number }
     }>>([])
 
-    // Локальное состояние для визуальных элементов
     const [localState, setLocalState] = useState({
         showIcon: true,
         isInteractable: false,
         iconCompleted: false
     })
 
-    // Используем простой хук для достижения
-    const { complete } = useSimpleMission('computer-speed-mission')
-
-    // 1. Инициализация - СБРАСЫВАЕМ всё при загрузке
     useEffect(() => {
-        console.log('Инициализация миссии скорости (компьютер) - СБРОС')
+        console.log('Инициализация миссии скорости')
 
-        // ВАЖНО: При каждой загрузке сбрасываем состояние сеанса
         speedMissionGlobal.missionComplete = false
         speedMissionGlobal.hasBeenCompletedInSession = false
         speedMissionGlobal.showSuccessModal = false
@@ -231,7 +179,6 @@ export default function ComputerSpeedMission({
         speedMissionGlobal.gameActive = false
         speedMissionGlobal.score = 0
 
-        // Устанавливаем иконку как НЕ выполненную
         setLocalState(prev => ({
             ...prev,
             iconCompleted: false
@@ -249,7 +196,6 @@ export default function ComputerSpeedMission({
         }
     }, [scene])
 
-    // 2. Проверка расстояния до компьютера
     useFrame(() => {
         if (computerRef.current && playerRef.current && !speedMissionGlobal.gameActive) {
             const distance = playerRef.current.position.distanceTo(computerRef.current.position)
@@ -262,7 +208,6 @@ export default function ComputerSpeedMission({
         }
     })
 
-    // 3. Создание новой папки
     const createFolder = () => {
         const types: ('urgent' | 'client' | 'spam')[] = ['urgent', 'client', 'spam']
         const type = types[Math.floor(Math.random() * types.length)]
@@ -282,7 +227,6 @@ export default function ComputerSpeedMission({
         }
     }
 
-    // 4. Инициализация папок
     const initializeFolders = (count: number = 10) => {
         const newFolders = []
         for (let i = 0; i < count; i++) {
@@ -291,7 +235,6 @@ export default function ComputerSpeedMission({
         setFolders(newFolders)
     }
 
-    // 5. Обработка клавиши F
     useEffect(() => {
         const handleKeyPress = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase()
@@ -312,53 +255,42 @@ export default function ComputerSpeedMission({
         return () => window.removeEventListener('keydown', handleKeyPress)
     }, [])
 
-    // 6. Фиксация камеры
     const lockCamera = () => {
         console.log('Фиксация камеры для миссии скорости')
         cameraLocked.current = true
 
-        // Сохраняем оригинальное положение и поворот камеры
         originalCameraPosition.current = camera.position.clone()
         originalCameraRotation.current = camera.rotation.clone()
 
-        // Отключаем движение мыши и показываем курсор
         document.body.style.cursor = 'default'
 
-        // Отключаем события мыши на canvas
         const canvas = document.querySelector('canvas')
         if (canvas) {
             canvas.style.pointerEvents = 'none'
         }
     }
 
-    // 7. Разблокировка камеры
     const unlockCamera = () => {
         console.log('Разблокировка камеры')
         cameraLocked.current = false
 
-        // Восстанавливаем курсор
         document.body.style.cursor = 'none'
 
-        // Включаем события мыши на canvas
         const canvas = document.querySelector('canvas')
         if (canvas) {
             canvas.style.pointerEvents = 'auto'
         }
     }
 
-    // 8. Фиксация камеры во время игры
     useFrame((state) => {
         if (cameraLocked.current && originalCameraPosition.current && originalCameraRotation.current) {
-            // Возвращаем камеру в исходное положение
             camera.position.copy(originalCameraPosition.current)
             camera.rotation.copy(originalCameraRotation.current)
 
-            // Отключаем любые обновления камеры из других систем
             state.camera.updateMatrixWorld()
         }
     })
 
-    // 9. Запуск игры
     const startGame = () => {
         console.log('Запуск игры "Скорость"')
 
@@ -372,7 +304,6 @@ export default function ComputerSpeedMission({
         speedMissionGlobal.countdown = 3
         speedMissionGlobal.showSuccessModal = false
 
-        // Обратный отсчет 3-2-1
         let countdown = 3
         speedMissionGlobal.countdown = countdown
 
@@ -391,7 +322,6 @@ export default function ComputerSpeedMission({
         }, 1000)
     }
 
-    // 10. Таймер игры
     const startGameTimer = () => {
         let timeLeft = 30
         speedMissionGlobal.timeLeft = timeLeft
@@ -400,7 +330,6 @@ export default function ComputerSpeedMission({
             timeLeft--
             speedMissionGlobal.timeLeft = timeLeft
 
-            // Увеличение скорости на 15 секунде
             if (timeLeft === 15) {
                 speedMissionGlobal.speedMultiplier = 1.8
                 setFolders(prev => prev.map(folder => ({
@@ -412,7 +341,6 @@ export default function ComputerSpeedMission({
                 })))
             }
 
-            // Обновление позиций папок
             setFolders(prev => prev.map(folder => {
                 let newX = folder.position.x + folder.velocity.x
                 let newY = folder.position.y + folder.velocity.y
@@ -438,7 +366,6 @@ export default function ComputerSpeedMission({
         }, 1000)
     }
 
-    // 11. Обработка клика по папке
     const handleFolderClick = (folderId: number, type: string) => {
         if (!speedMissionGlobal.gameActive || speedMissionGlobal.countdown !== null) return
 
@@ -447,19 +374,15 @@ export default function ComputerSpeedMission({
             return
         }
 
-        // Увеличение счета
         speedMissionGlobal.score++
 
-        // Удаление папки
         setFolders(prev => prev.filter(f => f.id !== folderId))
 
-        // Добавление новой папки
         setTimeout(() => {
             setFolders(prev => [...prev, createFolder()])
         }, 100)
     }
 
-    // 12. Завершение игры
     const endGame = (success: boolean) => {
         console.log(success ? 'Игра завершена успешно!' : 'Игра провалена')
 
@@ -471,20 +394,16 @@ export default function ComputerSpeedMission({
         speedMissionGlobal.gameActive = false
 
         if (success) {
-            // Устанавливаем флаги выполнения
             speedMissionGlobal.missionComplete = true
             speedMissionGlobal.hasBeenCompletedInSession = true
             speedMissionGlobal.gameOver = false
             speedMissionGlobal.showSuccessModal = true
 
-            // Обновляем иконку
             setLocalState(prev => ({
                 ...prev,
                 iconCompleted: true
             }))
 
-            // Записываем выполнение миссии в localStorage
-            complete()
             console.log('Миссия "computer-speed-mission" отмечена как выполненная')
         } else {
             speedMissionGlobal.gameOver = true
@@ -495,23 +414,20 @@ export default function ComputerSpeedMission({
         setFolders([])
     }
 
-    // Позиция для иконки - над компьютером (как было изначально)
     const iconPosition: [number, number, number] = [
         position[0],
-        position[1] - 0.2, // Над компьютером, как было в оригинале
+        position[1] - 0.2,
         position[2] + 0.5
     ]
 
     return (
         <group ref={computerRef} position={position} rotation={rotation}>
-            {/* Иконка задания - как было изначально */}
             <SpeedMissionIcon
                 position={iconPosition}
                 completed={localState.iconCompleted}
                 visible={!speedMissionGlobal.gameActive && localState.showIcon}
             />
 
-            {/* 3D модель компьютера */}
             <mesh>
                 <boxGeometry args={[0.3, 0.25, 0.05]} />
                 <meshStandardMaterial color="#333" />
@@ -521,7 +437,6 @@ export default function ComputerSpeedMission({
                 </mesh>
             </mesh>
 
-            {/* Игровой интерфейс */}
             {speedMissionGlobal.gameActive && (
                 <Html
                     fullscreen
@@ -535,7 +450,6 @@ export default function ComputerSpeedMission({
                     }}
                     zIndexRange={[100, 0]}
                 >
-                    {/* Затемнение фона */}
                     <div style={{
                         position: 'fixed',
                         top: 0,
@@ -546,7 +460,6 @@ export default function ComputerSpeedMission({
                         zIndex: 999
                     }} />
 
-                    {/* Модальное окно */}
                     <div style={{
                         position: 'fixed',
                         top: '50%',
@@ -561,7 +474,6 @@ export default function ComputerSpeedMission({
                         zIndex: 1000,
                         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
                     }}>
-                        {/* Заголовок */}
                         <div style={{
                             width: '100%',
                             padding: '15px',
@@ -575,7 +487,6 @@ export default function ComputerSpeedMission({
                             ⚡ МИССИЯ СКОРОСТЬ
                         </div>
 
-                        {/* Отсчет */}
                         {speedMissionGlobal.countdown !== null && (
                             <div style={{
                                 position: 'absolute',
@@ -592,7 +503,6 @@ export default function ComputerSpeedMission({
                             </div>
                         )}
 
-                        {/* Игровое поле */}
                         {speedMissionGlobal.countdown === null && (
                             <div style={{
                                 position: 'relative',
@@ -601,7 +511,6 @@ export default function ComputerSpeedMission({
                                 backgroundColor: '#1a252f',
                                 overflow: 'hidden'
                             }}>
-                                {/* Папки */}
                                 {folders.map(folder => (
                                     <div
                                         key={folder.id}
@@ -634,8 +543,6 @@ export default function ComputerSpeedMission({
                                             folder.type === 'client' ? 'КЛИЕНТ' : 'СПАМ'}
                                     </div>
                                 ))}
-
-                                {/* Статистика */}
                                 <div style={{
                                     position: 'absolute',
                                     top: '20px',
@@ -663,7 +570,6 @@ export default function ComputerSpeedMission({
                                     )}
                                 </div>
 
-                                {/* Инструкция */}
                                 <div style={{
                                     position: 'absolute',
                                     bottom: '20px',
@@ -689,7 +595,6 @@ export default function ComputerSpeedMission({
     )
 }
 
-// UI компонент - СИНГЛТОН, управляет всеми модалками
 export function ComputerSpeedMissionUI() {
     const [uiState, setUiState] = useState({
         showHint: false,
@@ -702,18 +607,13 @@ export function ComputerSpeedMissionUI() {
         isInteractable: false
     })
 
-    // Инициализация - один раз при загрузке
     useEffect(() => {
         console.log('UI: Инициализация компонента')
 
-        // Сбрасываем все флаги показов модалок
         speedMissionGlobal.showSuccessModal = false
         speedMissionGlobal.gameOver = false
-
-        // Не проверяем localStorage - иконка теперь не зависит от него
     }, [])
 
-    // Подписка на обновления глобального состояния
     useEffect(() => {
         const updateUI = () => {
             setUiState(prev => ({
@@ -733,7 +633,6 @@ export function ComputerSpeedMissionUI() {
         return () => clearInterval(interval)
     }, [])
 
-    // Управление курсором
     useEffect(() => {
         if (uiState.gameActive) {
             document.body.style.cursor = 'default'
@@ -742,7 +641,6 @@ export function ComputerSpeedMissionUI() {
         }
     }, [uiState.gameActive])
 
-    // Обработчик закрытия успешной модалки
     const handleCloseSuccessModal = () => {
         console.log('UI: Закрытие модалки успеха')
         speedMissionGlobal.showSuccessModal = false
@@ -754,7 +652,6 @@ export function ComputerSpeedMissionUI() {
         }))
     }
 
-    // Обработчик закрытия модалки проигрыша
     const handleCloseGameOverModal = () => {
         console.log('UI: Закрытие модалки проигрыша')
         speedMissionGlobal.gameOver = false
@@ -768,7 +665,6 @@ export function ComputerSpeedMissionUI() {
 
     return (
         <>
-            {/* Подсказка о нажатии F */}
             {uiState.isInteractable && !uiState.gameActive && !uiState.showSuccessModal && !uiState.showGameOverModal && (
                 <div style={{
                     position: 'fixed',
@@ -792,7 +688,6 @@ export function ComputerSpeedMissionUI() {
                 </div>
             )}
 
-            {/* Сообщение об успехе - СТИЛЬ ИЗ ВТОРОГО КОДА */}
             {uiState.showSuccessModal && (
                 <div style={{
                     position: 'fixed',
@@ -879,7 +774,6 @@ export function ComputerSpeedMissionUI() {
                 </div>
             )}
 
-            {/* Сообщение о проигрыше - СТИЛЬ ИЗ ВТОРОГО КОДА */}
             {uiState.showGameOverModal && (
                 <div style={{
                     position: 'fixed',
@@ -966,131 +860,5 @@ export function ComputerSpeedMissionUI() {
                 </div>
             )}
         </>
-    )
-}
-
-// Компонент для отображения достижения
-export function SimpleAchievement() {
-    const [showAchievement, setShowAchievement] = useState(false)
-
-    useEffect(() => {
-        // Слушаем событие показа достижения
-        const handleShowAchievement = () => {
-            setShowAchievement(true)
-        }
-
-        window.addEventListener('show-achievement', handleShowAchievement)
-
-        return () => {
-            window.removeEventListener('show-achievement', handleShowAchievement)
-        }
-    }, [])
-
-    if (!showAchievement) return null
-
-    return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-        }}>
-            <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: '40px',
-                borderRadius: '20px',
-                maxWidth: '500px',
-                width: '90%',
-                textAlign: 'center',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-                border: '2px solid rgba(255, 255, 255, 0.2)',
-                animation: 'slideIn 0.5s ease-out'
-            }}>
-                <div style={{
-                    fontSize: '4rem',
-                    marginBottom: '20px',
-                    animation: 'bounce 1s infinite alternate'
-                }}>
-                    🏆
-                </div>
-
-                <h2 style={{
-                    color: 'white',
-                    fontSize: '32px',
-                    marginBottom: '15px',
-                    fontWeight: 'bold'
-                }}>
-                    Достижение разблокировано!
-                </h2>
-
-                <div style={{
-                    color: 'white',
-                    fontSize: '24px',
-                    marginBottom: '25px',
-                    fontWeight: '600',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    padding: '15px',
-                    borderRadius: '10px'
-                }}>
-                    Вы освоили ценность "Скорость"!
-                </div>
-
-                <p style={{
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '16px',
-                    marginBottom: '30px',
-                    lineHeight: '1.5'
-                }}>
-                    Поздравляем! Вы успешно завершили все задания.
-                </p>
-
-                <button
-                    onClick={() => setShowAchievement(false)}
-                    style={{
-                        background: 'white',
-                        color: '#764ba2',
-                        border: 'none',
-                        padding: '12px 40px',
-                        fontSize: '18px',
-                        borderRadius: '50px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                    Продолжить
-                </button>
-            </div>
-
-            <style jsx>{`
-                @keyframes slideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-50px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                @keyframes bounce {
-                    from {
-                        transform: translateY(0);
-                    }
-                    to {
-                        transform: translateY(-10px);
-                    }
-                }
-            `}</style>
-        </div>
     )
 }

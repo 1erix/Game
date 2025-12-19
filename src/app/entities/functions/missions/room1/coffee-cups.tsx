@@ -1,4 +1,3 @@
-// app/entities/functions/missions/room1/coffee-cups.tsx
 'use client'
 
 import { useFrame, useThree } from '@react-three/fiber'
@@ -7,61 +6,22 @@ import * as THREE from 'three'
 import { Html } from '@react-three/drei'
 import CoffeeCups from '@/app/entities/room1/coffee-cups'
 
-// === ПРОСТАЯ СИСТЕМА ДОСТИЖЕНИЙ (встроенная) ===
-const ALL_MISSIONS = ['click-sprint-mission', 'computer-speed-mission']
-
-// Функция для отметки выполнения миссии
-const markMissionComplete = (missionId: string) => {
-    // Сохраняем в localStorage
-    localStorage.setItem(`mission-${missionId}`, 'completed')
-
-    // Проверяем все ли миссии выполнены
-    const allCompleted = ALL_MISSIONS.every(id =>
-        localStorage.getItem(`mission-${id}`) === 'completed'
-    )
-
-    if (allCompleted && !localStorage.getItem('speed-achievement-shown')) {
-        // Показываем достижение через 1 секунду
-        setTimeout(() => {
-            const event = new CustomEvent('show-achievement')
-            window.dispatchEvent(event)
-            localStorage.setItem('speed-achievement-shown', 'true')
-        }, 1000)
-    }
-}
-
-// Хук для миссии
-const useSimpleMission = (missionId: string) => {
-    const complete = () => {
-        markMissionComplete(missionId)
-    }
-
-    const isCompleted = () => {
-        return localStorage.getItem(`mission-${missionId}`) === 'completed'
-    }
-
-    return { complete, isCompleted }
-}
-// === КОНЕЦ СИСТЕМЫ ДОСТИЖЕНИЙ ===
-
-// Простое глобальное состояние для связи между компонентами
 const missionGlobal = {
     showHint: false,
     gameActive: false,
-    missionComplete: false, // ТОЛЬКО для текущей сессии
+    missionComplete: false,
     timer: 20,
     cupsRemaining: 3,
     showCompletionMessage: false,
-    wasPreviouslyCompleted: false // Флаг для хранения информации о прошлых выполнениях
+    wasPreviouslyCompleted: false
 }
 
-// Компонент иконки задания
 function MissionIcon({ completed = false, visible = true }) {
     if (!visible) return null
 
     return (
         <Html
-            position={[2.6, 0.5, -2.4]} // Над столом
+            position={[2.6, 0.5, -2.4]}
             center
             style={{
                 pointerEvents: 'none',
@@ -75,7 +35,6 @@ function MissionIcon({ completed = false, visible = true }) {
                 justifyContent: 'center',
                 transform: 'translate(-50%, -50%)'
             }}>
-                {/* Основная иконка */}
                 <div style={{
                     width: '60px',
                     height: '60px',
@@ -95,7 +54,6 @@ function MissionIcon({ completed = false, visible = true }) {
                     position: 'relative',
                     overflow: 'hidden'
                 }}>
-                    {/* Внутренний круг */}
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -105,7 +63,6 @@ function MissionIcon({ completed = false, visible = true }) {
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        {/* Иконка */}
                         {completed ? (
                             <svg
                                 width="24"
@@ -135,7 +92,6 @@ function MissionIcon({ completed = false, visible = true }) {
                         )}
                     </div>
 
-                    {/* Анимация пульсации для активного задания */}
                     {!completed && !missionGlobal.gameActive && (
                         <div style={{
                             position: 'absolute',
@@ -150,7 +106,6 @@ function MissionIcon({ completed = false, visible = true }) {
                     )}
                 </div>
 
-                {/* Текст под иконкой */}
                 <div style={{
                     marginTop: '8px',
                     fontSize: '14px',
@@ -182,20 +137,14 @@ export default function ClickSprintMission() {
     const playerRef = useRef<THREE.Object3D | null>(null)
     const playerControlsRef = useRef<any>(null)
 
-    // Используем простой хук для достижения (встроенный в этот файл)
-    const { complete, isCompleted } = useSimpleMission('click-sprint-mission')
-
-    // Рефы для управления камерой
     const originalCameraPos = useRef<THREE.Vector3>(new THREE.Vector3())
     const originalCameraRotation = useRef<THREE.Euler>(new THREE.Euler())
     const cameraRotationAngle = useRef(0)
     const isCameraTopView = useRef(false)
 
-    // 1. Инициализация - ВСЕГДА показываем задание как НЕ ВЫПОЛНЕННОЕ при загрузке
     useEffect(() => {
-        console.log('Инициализация миссии скорости - ВСЕГДА НАЧИНАЕМ С НАЧАЛА')
+        console.log('Инициализация миссии скорости ')
 
-        // ПРИ ЗАГРУЗКЕ ВСЕГДА СБРАСЫВАЕМ ВСЕ СОСТОЯНИЯ
         missionGlobal.missionComplete = false
         missionGlobal.showCompletionMessage = false
         missionGlobal.gameActive = false
@@ -203,24 +152,17 @@ export default function ClickSprintMission() {
         missionGlobal.cupsRemaining = 3
         missionGlobal.timer = 20
 
-        // Запоминаем, была ли миссия выполнена ранее (только для информации)
-        missionGlobal.wasPreviouslyCompleted = isCompleted()
-
-        // Находим игрока
         const player = scene.getObjectByName('player')
         if (player) {
             playerRef.current = player
-            // Сохраняем контролы игрока если они есть
             if (player.userData && player.userData.controls) {
                 playerControlsRef.current = player.userData.controls
             }
         }
 
-        // Сохраняем исходное положение камеры
         originalCameraPos.current.copy(camera.position)
         originalCameraRotation.current.copy(camera.rotation)
 
-        // ВСЕГДА создаем 3 кружки при загрузке, даже если миссия была пройдена ранее
         const initialCups = [
             { id: 1, position: [2.4, 0.1, -2.3] as [number, number, number] },
             { id: 2, position: [2.6, 0.1, -2.4] as [number, number, number] },
@@ -234,12 +176,10 @@ export default function ClickSprintMission() {
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
-            // Всегда разблокируем камеру при размонтировании
             unlockCamera()
         }
     }, [scene, camera])
 
-    // 2. Проверка близости игрока к столу
     useFrame(() => {
         if (missionGlobal.gameActive) return
 
@@ -258,7 +198,6 @@ export default function ClickSprintMission() {
         }
     })
 
-    // 3. Обработка клавиши F
     useEffect(() => {
         const handleKeyPress = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase()
@@ -274,94 +213,72 @@ export default function ClickSprintMission() {
         return () => window.removeEventListener('keydown', handleKeyPress)
     }, [])
 
-    // Фиксация камеры сверху (исправленная версия)
     const lockCameraTopView = () => {
         console.log('Фиксация камеры сверху без вращения')
         cameraLocked.current = true
-        isCameraTopView.current = false // Отключаем вращение
+        isCameraTopView.current = false
 
-        // Показываем курсор
         document.body.style.cursor = 'default'
 
-        // Отключаем движение игрока через его контролы
         if (playerControlsRef.current) {
             playerControlsRef.current.enabled = false
         }
 
-        // Устанавливаем камеру сверху (ближе к столу, без вращения)
         const tablePosition = new THREE.Vector3(2.6, 0, -2.4)
 
-        // Фиксированная позиция камеры сверху (ближе, чтобы лучше видеть кружки)
         const topViewPosition = new THREE.Vector3(
             tablePosition.x,
-            tablePosition.y + 2.5, // Опускаем камеру ниже (было 5)
-            tablePosition.z + 1.5  // Сдвигаем немного назад для лучшего обзора
+            tablePosition.y + 2.5,
+            tablePosition.z + 1.5
         )
 
-        // Мгновенно устанавливаем позицию камеры (без lerp)
         camera.position.copy(topViewPosition)
 
-        // Направляем камеру на стол (немного под углом)
         camera.lookAt(tablePosition.x, tablePosition.y + 0.2, tablePosition.z)
 
-        // Сохраняем позицию для разблокировки
         originalCameraPos.current.copy(topViewPosition)
 
-        // Отключаем все анимации камеры
         camera.matrixAutoUpdate = false
         camera.updateMatrix()
     }
 
-    // Разблокировка камеры и игрока
     const unlockCamera = () => {
         console.log('Разблокировка камеры и игрока')
         cameraLocked.current = false
         isCameraTopView.current = false
 
-        // Включаем обновление матрицы камеры
         camera.matrixAutoUpdate = true
 
-        // Скрываем курсор
         document.body.style.cursor = 'none'
 
-        // Включаем движение игрока
         if (playerControlsRef.current) {
             playerControlsRef.current.enabled = true
         }
     }
 
-    // 4. Фиксация камеры во время игры (убираем вращение)
-    useFrame((state, delta) => {
+    useFrame(() => {
         if (!cameraLocked.current) return
-
-        // Когда камера зафиксирована, просто оставляем её на месте
-        // Не делаем никаких анимаций или вращений
     })
 
-    // 4. Начало миссии
     const startMission = () => {
         console.log('Начало миссии скорости')
 
-        // Фиксируем камеру сверху
         lockCameraTopView()
 
-        // Меняем состояние
         missionGlobal.gameActive = true
         missionGlobal.timer = 20
 
-        // Очищаем старые кружки и создаем 10 новых
         setCups([])
 
-        // Небольшая задержка перед созданием новых кружек
         setTimeout(() => {
             const missionCups = []
             for (let i = 0; i < 10; i++) {
                 missionCups.push({
                     id: 10 + i,
                     position: [
-                        2.6 + (Math.random() - 0.5) * 0.4, // Уменьшаем разброс
+                        2.6 + (Math.random() - 0.5) * 0.4,
                         0.1,
-                        -2.4 + (Math.random() - 0.5) * 0.4  // Уменьшаем разброс
+                        -2.4 + (Math.random() - 0.5) * 0.4
                     ] as [number, number, number]
                 })
             }
@@ -370,7 +287,6 @@ export default function ClickSprintMission() {
             missionGlobal.cupsRemaining = missionCups.length
         }, 100)
 
-        // Таймер 20 секунд
         let timeLeft = 20
         missionGlobal.timer = timeLeft
 
@@ -385,7 +301,6 @@ export default function ClickSprintMission() {
         }, 1000)
     }
 
-    // 5. Клик по кружке
     const handleClick = (cupId: number) => {
         if (!missionGlobal.gameActive) {
             console.log('Клик вне активной миссии')
@@ -394,48 +309,37 @@ export default function ClickSprintMission() {
 
         console.log(`Клик по кружке ${cupId}`)
 
-        // Убираем кружку
         const newCups = cups.filter(cup => cup.id !== cupId)
         setCups(newCups)
         missionGlobal.cupsRemaining = newCups.length
 
-        // Проверяем завершение миссии
         if (newCups.length === 0) {
             console.log('Все кружки убраны!')
             endMission(true)
         }
     }
 
-    // 6. Завершение миссии
     const endMission = (success: boolean) => {
         console.log(success ? 'Миссия выполнена успешно!' : 'Миссия провалена')
 
-        // Останавливаем таймер
         if (timerRef.current) {
             clearInterval(timerRef.current)
         }
 
-        // Разблокируем камеру
         unlockCamera()
 
-        // Меняем состояние
         missionGlobal.gameActive = false
 
         if (success) {
             missionGlobal.missionComplete = true
-            missionGlobal.showCompletionMessage = true // ВКЛЮЧАЕМ показ сообщения
-            // Записываем выполнение миссии в систему достижений
-            complete()
+            missionGlobal.showCompletionMessage = true
             console.log('Миссия "click-sprint-mission" отмечена как выполненная')
-            // Стол остается пустым
-            setCups([]) // Очищаем все кружки
+            setCups([])
 
-            // Автоматически скрываем сообщение через 5 секунд
             setTimeout(() => {
                 missionGlobal.showCompletionMessage = false
             }, 5000)
         } else {
-            // Возвращаем 3 постоянные кружки через 2 секунды
             setTimeout(() => {
                 console.log('Возвращаем постоянные кружки')
                 const initialCups = [
@@ -451,16 +355,13 @@ export default function ClickSprintMission() {
         }
     }
 
-    // 8. Рендер
     return (
         <>
-            {/* Иконка задания - показываем "ВЫПОЛНЕНО" только если миссия выполнена в ЭТОЙ сессии */}
             <MissionIcon
                 completed={missionGlobal.missionComplete}
                 visible={!missionGlobal.gameActive}
             />
 
-            {/* Рендерим кружки только если миссия не выполнена в ЭТОЙ сессии */}
             {!missionGlobal.missionComplete && cups.map(cup => (
                 <group
                     key={cup.id}
@@ -489,7 +390,6 @@ export default function ClickSprintMission() {
     )
 }
 
-// UI компонент
 export function SpeedMissionUI() {
     const [state, setState] = useState({
         showHint: missionGlobal.showHint,
@@ -500,7 +400,6 @@ export function SpeedMissionUI() {
         showCompletionMessage: missionGlobal.showCompletionMessage
     })
 
-    // 1. Подписка на обновления глобального состояния
     useEffect(() => {
         const updateState = () => {
             setState({
@@ -513,26 +412,20 @@ export function SpeedMissionUI() {
             })
         }
 
-        // Проверяем состояние каждые 50ms для плавности
         const interval = setInterval(updateState, 50)
         return () => clearInterval(interval)
     }, [])
 
-    // 2. Управление курсором
     useEffect(() => {
         if (state.gameActive) {
-            // Курсор виден во время миссии
             document.body.style.cursor = 'default'
         } else if (!state.missionComplete) {
-            // Курсор скрыт когда не в миссии
             document.body.style.cursor = 'none'
         }
     }, [state.gameActive, state.missionComplete])
 
-    // 3. Рендер UI
     return (
         <>
-            {/* Подсказка о нажатии F - показываем только если миссия не выполнена в ЭТОЙ сессии */}
             {state.showHint && !state.gameActive && !state.missionComplete && (
                 <div style={{
                     position: 'fixed',
@@ -556,7 +449,6 @@ export function SpeedMissionUI() {
                 </div>
             )}
 
-            {/* Интерфейс во время миссии */}
             {state.gameActive && (
                 <div style={{
                     position: 'fixed',
@@ -581,7 +473,7 @@ export function SpeedMissionUI() {
                         color: '#3498db',
                         fontWeight: 'bold'
                     }}>
-                        ⚡ Миссия: Скорость
+                        Миссия: Скорость
                     </div>
 
                     <div style={{
@@ -614,7 +506,6 @@ export function SpeedMissionUI() {
                 </div>
             )}
 
-            {/* Сообщение об успехе - показываем ТОЛЬКО если специально включен флаг showCompletionMessage */}
             {state.showCompletionMessage && (
                 <div style={{
                     position: 'fixed',
@@ -638,7 +529,7 @@ export function SpeedMissionUI() {
                         color: '#2ecc71',
                         fontWeight: 'bold'
                     }}>
-                        🎉 Миссия выполнена!
+                        Миссия выполнена!
                     </div>
 
                     <div style={{
@@ -682,131 +573,5 @@ export function SpeedMissionUI() {
                 </div>
             )}
         </>
-    )
-}
-
-// Компонент для отображения достижения (добавьте его в ваш главный файл FirstRoom.tsx)
-export function SimpleAchievement() {
-    const [showAchievement, setShowAchievement] = useState(false)
-
-    useEffect(() => {
-        // Слушаем событие показа достижения
-        const handleShowAchievement = () => {
-            setShowAchievement(true)
-        }
-
-        window.addEventListener('show-achievement', handleShowAchievement)
-
-        return () => {
-            window.removeEventListener('show-achievement', handleShowAchievement)
-        }
-    }, [])
-
-    if (!showAchievement) return null
-
-    return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-        }}>
-            <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: '40px',
-                borderRadius: '20px',
-                maxWidth: '500px',
-                width: '90%',
-                textAlign: 'center',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-                border: '2px solid rgba(255, 255, 255, 0.2)',
-                animation: 'slideIn 0.5s ease-out'
-            }}>
-                <div style={{
-                    fontSize: '4rem',
-                    marginBottom: '20px',
-                    animation: 'bounce 1s infinite alternate'
-                }}>
-                    🏆
-                </div>
-
-                <h2 style={{
-                    color: 'white',
-                    fontSize: '32px',
-                    marginBottom: '15px',
-                    fontWeight: 'bold'
-                }}>
-                    Достижение разблокировано!
-                </h2>
-
-                <div style={{
-                    color: 'white',
-                    fontSize: '24px',
-                    marginBottom: '25px',
-                    fontWeight: '600',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    padding: '15px',
-                    borderRadius: '10px'
-                }}>
-                    Вы освоили ценность "Скорость"!
-                </div>
-
-                <p style={{
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '16px',
-                    marginBottom: '30px',
-                    lineHeight: '1.5'
-                }}>
-                    Поздравляем! Вы успешно завершили все задания.
-                </p>
-
-                <button
-                    onClick={() => setShowAchievement(false)}
-                    style={{
-                        background: 'white',
-                        color: '#764ba2',
-                        border: 'none',
-                        padding: '12px 40px',
-                        fontSize: '18px',
-                        borderRadius: '50px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                    Продолжить
-                </button>
-            </div>
-
-            <style jsx>{`
-                @keyframes slideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-50px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                @keyframes bounce {
-                    from {
-                        transform: translateY(0);
-                    }
-                    to {
-                        transform: translateY(-10px);
-                    }
-                }
-            `}</style>
-        </div>
     )
 }

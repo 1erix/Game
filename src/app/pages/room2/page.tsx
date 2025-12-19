@@ -25,76 +25,73 @@ import WallDecor from "@/app/entities/room2/walldecorations"
 import Room2Floor from "@/app/entities/textures/room2floor"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { useRouter } from "next/navigation"
-import { Suspense, useEffect, useRef } from "react"
+import { Suspense, useRef } from "react"
 import * as THREE from 'three'
 
-function HybridCamera() {
-    const { camera } = useThree()
-    const player = useThree(state => state.scene.getObjectByName('player'))
-
-    const cameraPosition = useRef(new THREE.Vector3())
-    const cameraLookAt = useRef(new THREE.Vector3())
-    const mouseRotation = useRef({ x: 0, y: 0 })
-
-    const baseOffset = new THREE.Vector3(1, 1, -2)
+function applyCameraConstraints(camera: THREE.Camera, cameraPosition: THREE.Vector3, playerPosition: THREE.Vector3): THREE.Vector3 {
+    const wallOffset = 1.0
 
     const roomBounds = {
-        minX: -4.8,
-        maxX: 4.8,
-        minY: 0.5,
-        maxY: 3,
-        minZ: -4.8,
-        maxZ: 4.8
+        minX: -5 + wallOffset,
+        maxX: 5 - wallOffset,
+        minY: 0.8,
+        maxY: 2.5,
+        minZ: -5 + wallOffset,
+        maxZ: 5 - wallOffset
     }
 
-    const mouseSensitivity = 0.006
+    const lookAtTarget = playerPosition.clone().add(new THREE.Vector3(0, 0.8, 0))
 
-    useEffect(() => {
-        const handleMouseMove = (event: MouseEvent) => {
-            if (!player) return
+    const constrainedPosition = cameraPosition.clone()
 
-            mouseRotation.current.x += event.movementX * mouseSensitivity
-            mouseRotation.current.y += event.movementY * mouseSensitivity
+    constrainedPosition.x = THREE.MathUtils.clamp(
+        constrainedPosition.x,
+        roomBounds.minX,
+        roomBounds.maxX
+    )
 
-            mouseRotation.current.y = Math.max(-0.8, Math.min(0.8, mouseRotation.current.y))
-        }
+    constrainedPosition.y = THREE.MathUtils.clamp(
+        constrainedPosition.y,
+        roomBounds.minY,
+        roomBounds.maxY
+    )
 
-        window.addEventListener('mousemove', handleMouseMove)
+    constrainedPosition.z = THREE.MathUtils.clamp(
+        constrainedPosition.z,
+        roomBounds.minZ,
+        roomBounds.maxZ
+    )
 
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove)
-        }
-    }, [player])
+    camera.position.copy(constrainedPosition)
+    camera.lookAt(lookAtTarget)
 
-    useFrame((state, delta) => {
+    return constrainedPosition
+}
+
+function CameraController() {
+    const { camera, scene } = useThree()
+    const cameraPosition = useRef(new THREE.Vector3(0, 0.8, -3))
+
+    const horizontalOffset = useRef(new THREE.Vector3(0, 0, -3))
+
+    useFrame(() => {
+        const player = scene.getObjectByName('player')
         if (!player) return
 
-        const targetPosition = new THREE.Vector3()
-        const lookAtTarget = new THREE.Vector3()
+        const playerRotationY = player.rotation.y
 
-        const spherical = new THREE.Spherical()
-        spherical.radius = baseOffset.length()
-        spherical.theta = mouseRotation.current.x + Math.PI
-        spherical.phi = Math.PI / 2 + mouseRotation.current.y
+        const rotatedHorizontalOffset = horizontalOffset.current.clone().applyAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            playerRotationY
+        )
 
-        const offset = new THREE.Vector3()
-        offset.setFromSpherical(spherical)
+        const targetCameraPosition = player.position.clone()
+            .add(rotatedHorizontalOffset)
+            .add(new THREE.Vector3(0, 0.8, 0))
 
-        targetPosition.copy(player.position).add(offset)
-        lookAtTarget.copy(player.position)
+        cameraPosition.current.lerp(targetCameraPosition, 0.1)
 
-        targetPosition.x = THREE.MathUtils.clamp(targetPosition.x, roomBounds.minX, roomBounds.maxX)
-        targetPosition.y = THREE.MathUtils.clamp(targetPosition.y, roomBounds.minY, roomBounds.maxY)
-        targetPosition.z = THREE.MathUtils.clamp(targetPosition.z, roomBounds.minZ, roomBounds.maxZ)
-
-        lookAtTarget.x = THREE.MathUtils.clamp(lookAtTarget.x, roomBounds.minX + 0.5, roomBounds.maxX - 0.5)
-        lookAtTarget.z = THREE.MathUtils.clamp(lookAtTarget.z, roomBounds.minZ + 0.5, roomBounds.maxZ - 0.5)
-
-        cameraPosition.current.lerp(targetPosition, 5 * delta)
-        cameraLookAt.current.lerp(lookAtTarget, 5 * delta)
-
-        camera.position.copy(cameraPosition.current)
-        camera.lookAt(cameraLookAt.current)
+        applyCameraConstraints(camera, cameraPosition.current, player.position)
     })
 
     return null
@@ -123,7 +120,6 @@ function PlayerController() {
         { position: [-3, -2.5], radius: 0.8, name: 'tennis_table' },
         { position: [4, 4.5], radius: 0.8, name: 'fridge' },
         { position: [-3, 3], radius: 0.8, name: 'coffe_table' },
-
     ]
 
     useFrame(() => {
@@ -155,11 +151,6 @@ function PlayerController() {
         }
 
         player.position.copy(playerPos)
-
-
-
-
-        // console.log(playerPos)
     })
 
     return null
@@ -182,8 +173,12 @@ export default function SecondRoom() {
         <div style={{ width: '100vw', height: '100vh' }}>
             <LoadingScreen />
             <ResponsibilityMissionUI />
-            <Canvas>
+            <Canvas camera={{ position: [0, 0.8, -3], fov: 65 }}>
                 <Suspense fallback={null}>
+                    <HideCursor />
+                    <CameraController />
+                    <PlayerController />
+
                     <ambientLight intensity={1} />
                     <directionalLight
                         position={[10, 10, 3.5]}
@@ -198,10 +193,6 @@ export default function SecondRoom() {
                         shadow-camera-bottom={-10} />
                     <pointLight position={[0, 2, 2.5]} intensity={2} color={'white'} />
 
-                    <HybridCamera />
-                    <PlayerController />
-                    <HideCursor />
-
                     <Door position={[0, -1, -4.95]} scale={0.01} onDoorClick={handleDoorClick} />
                     <DoorInteraction doorPositions={doorPosition} />
 
@@ -209,7 +200,6 @@ export default function SecondRoom() {
 
                     <ConsoleTable />
                     <Kitchen />
-
 
                     <BarChairs position={[4.5, -1, 0]} rotation={[0, 1.6, 0]} />
                     <BarChairs position={[3.5, -1, 0]} rotation={[0, 1.6, 0]} />
@@ -241,10 +231,7 @@ export default function SecondRoom() {
 
                     <Player />
 
-
                     <NPC />
-
-                    {/* <MissionNPCWrapper /> */}
 
                     <ResponsibilityMission />
 

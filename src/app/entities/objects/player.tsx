@@ -27,7 +27,7 @@ export default function Player() {
     const jumpHeight = 0.5
     const gravity = 9.8
     const floorY = -1
-    const ceilingY = 1.5
+    const maxJumpHeight = 10
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -83,8 +83,10 @@ export default function Player() {
             jumpState.current.velocity -= gravity * deltaTime
             const newY = group.current.position.y + jumpState.current.velocity * deltaTime
 
-            if (newY > jumpState.current.startY + ceilingY) {
-                group.current.position.y = jumpState.current.startY + ceilingY
+            const maxAllowedY = jumpState.current.startY + maxJumpHeight
+
+            if (newY > maxAllowedY) {
+                group.current.position.y = maxAllowedY
                 jumpState.current.velocity = 0
             } else if (newY <= floorY) {
                 group.current.position.y = floorY

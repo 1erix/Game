@@ -16,79 +16,73 @@ import BusinessCards from '@/app/entities/start/business_cards'
 import Monstera from '@/app/entities/start/monstera'
 import Player from '@/app/entities/objects/player'
 import * as THREE from 'three'
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import HideCursor from '@/app/entities/functions/hideCursor'
 import DoorInteraction from '@/app/entities/functions/doorFunc'
 import LoadingScreen from '@/app/entities/functions/loading'
 
-function HybridCamera() {
-    const { camera } = useThree()
-    const player = useThree(state => state.scene.getObjectByName('player'))
-
-    const cameraPosition = useRef(new THREE.Vector3())
-    const cameraLookAt = useRef(new THREE.Vector3())
-    const mouseRotation = useRef({ x: 0, y: 0 })
-
-    const baseOffset = new THREE.Vector3(1, 1, -2)
-
+function applyCameraConstraints(camera: THREE.Camera, cameraPosition: THREE.Vector3, playerPosition: THREE.Vector3): THREE.Vector3 {
     const roomBounds = {
-        minX: -3.4,
-        maxX: 3.4,
-        minY: 0.5,
-        maxY: 3,
-        minZ: -2.4,
-        maxZ: 2.4
+        minX: -3.2,
+        maxX: 3.2,
+        minY: 0.8,
+        maxY: 1.8,
+        minZ: -2.2,
+        maxZ: 2.2
     }
 
-    const mouseSensitivity = 0.006
+    const lookAtTarget = playerPosition.clone().add(new THREE.Vector3(0, 0.8, 0))
 
-    useEffect(() => {
+    const constrainedPosition = cameraPosition.clone()
 
-        const handleMouseMove = (event: MouseEvent) => {
-            if (!player) return
+    constrainedPosition.x = THREE.MathUtils.clamp(
+        constrainedPosition.x,
+        roomBounds.minX,
+        roomBounds.maxX
+    )
 
-            mouseRotation.current.x += event.movementX * mouseSensitivity
-            mouseRotation.current.y += event.movementY * mouseSensitivity
+    constrainedPosition.y = THREE.MathUtils.clamp(
+        constrainedPosition.y,
+        roomBounds.minY,
+        roomBounds.maxY
+    )
 
-            mouseRotation.current.y = Math.max(-0.8, Math.min(0.8, mouseRotation.current.y))
-        }
+    constrainedPosition.z = THREE.MathUtils.clamp(
+        constrainedPosition.z,
+        roomBounds.minZ,
+        roomBounds.maxZ
+    )
 
-        window.addEventListener('mousemove', handleMouseMove)
+    camera.position.copy(constrainedPosition)
+    camera.lookAt(lookAtTarget)
 
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove)
-        }
-    }, [player])
+    return constrainedPosition
+}
 
-    useFrame((state, delta) => {
+function CameraController() {
+    const { camera, scene } = useThree()
+    const cameraPosition = useRef(new THREE.Vector3(0, 0.8, -2.5))
+
+    const horizontalOffset = useRef(new THREE.Vector3(0, 0, -2.5))
+
+    useFrame(() => {
+        const player = scene.getObjectByName('player')
         if (!player) return
 
-        const targetPosition = new THREE.Vector3()
-        const lookAtTarget = new THREE.Vector3()
+        const playerRotationY = player.rotation.y
 
-        const spherical = new THREE.Spherical()
-        spherical.radius = baseOffset.length()
-        spherical.theta = mouseRotation.current.x + Math.PI
-        spherical.phi = Math.PI / 2 + mouseRotation.current.y
+        const rotatedHorizontalOffset = horizontalOffset.current.clone().applyAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            playerRotationY
+        )
 
-        const offset = new THREE.Vector3()
-        offset.setFromSpherical(spherical)
+        const targetCameraPosition = player.position.clone()
+            .add(rotatedHorizontalOffset)
+            .add(new THREE.Vector3(0, 0.8, 0))
 
-        targetPosition.copy(player.position).add(offset)
-        lookAtTarget.copy(player.position)
+        cameraPosition.current.lerp(targetCameraPosition, 0.1)
 
-        targetPosition.x = THREE.MathUtils.clamp(targetPosition.x, roomBounds.minX, roomBounds.maxX)
-        targetPosition.y = THREE.MathUtils.clamp(targetPosition.y, roomBounds.minY, roomBounds.maxY)
-        targetPosition.z = THREE.MathUtils.clamp(targetPosition.z, roomBounds.minZ, roomBounds.maxZ)
-
-        lookAtTarget.x = THREE.MathUtils.clamp(lookAtTarget.x, roomBounds.minX + 0.5, roomBounds.maxX - 0.5)
-        lookAtTarget.z = THREE.MathUtils.clamp(lookAtTarget.z, roomBounds.minZ + 0.5, roomBounds.maxZ - 0.5)
-
-        cameraPosition.current.lerp(targetPosition, 5 * delta)
-        cameraLookAt.current.lerp(lookAtTarget, 5 * delta)
-
-        camera.position.copy(cameraPosition.current)
-        camera.lookAt(cameraLookAt.current)
+        applyCameraConstraints(camera, cameraPosition.current, player.position)
     })
 
     return null
@@ -150,15 +144,15 @@ export default function Home() {
     const router = useRouter()
 
     const handleDoor1Click = () => {
-        router.push('/pages/room1?spawn=door')
+        router.push('/pages/room1')
     }
 
     const handleDoor2Click = () => {
-        router.push('/pages/room2?spawn=door')
+        router.push('/pages/room2')
     }
 
     const handleDoor3Click = () => {
-        router.push('/pages/room3?spawn=door')
+        router.push('/pages/room3')
     }
 
     const doorPositions = [
@@ -177,12 +171,11 @@ export default function Home() {
     ]
 
     return (
-
         <div style={{ width: '100vw', height: '100vh' }}>
             <LoadingScreen />
-            <Canvas>
+            <Canvas camera={{ position: [0, 0.8, -2.5], fov: 65 }}>
                 <HideCursor />
-                <HybridCamera />
+                <CameraController />
                 <PlayerController />
 
                 <ambientLight intensity={1.2} />
@@ -201,7 +194,6 @@ export default function Home() {
                 <pointLight position={[10, 10, 10]} />
 
                 <DoorInteraction doorPositions={doorPositions} />
-
 
                 <Door scale={0.01} position={[-2, -1, -2.45]} onDoorClick={handleDoor1Click} />
                 <Door scale={0.01} position={[0, -1, -2.45]} onDoorClick={handleDoor2Click} />
